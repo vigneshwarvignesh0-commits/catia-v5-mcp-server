@@ -12,3 +12,7 @@ venv/
 # GSD smoke test outputs
 GSD_SmokeTest*.CATPart
 gsd_smoke_test.jpg
+
+# Local backups / experiment bundles (personal, not part of the shared server)
+backup_*/
+*.zip
