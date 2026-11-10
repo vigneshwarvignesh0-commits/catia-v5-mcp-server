@@ -303,17 +303,20 @@ class PartDesignTools:
                         "faces_to_remove": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Names of faces to remove (create openings). E.g., ['Face.1']",
+                            "description": "BRepNames of faces to remove (create openings). At least one is required. Use catia_list_faces to see available faces.",
                         },
                     },
-                    "required": ["thickness"],
+                    "required": ["thickness", "faces_to_remove"],
                 },
             },
             {
                 "name": "catia_draft",
                 "description": (
                     "Add a Draft Angle to faces for mold-release purposes. "
-                    "Tapers faces by a given angle relative to a pulling direction."
+                    "Tapers faces by a given angle relative to a pulling direction. "
+                    "The face to draft and the neutral face are supplied independently "
+                    "as BRepName identifiers (e.g. 'Pad.1;3'). Use catia_list_faces to "
+                    "discover the available face identifiers."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -324,16 +327,32 @@ class PartDesignTools:
                         },
                         "face_name": {
                             "type": "string",
-                            "description": "Name of the face to draft",
+                            "description": (
+                                "BRepName of the face to draft (e.g. 'Pad.1;3'). "
+                                "Use catia_list_faces to see available faces."
+                            ),
+                        },
+                        "neutral_face": {
+                            "type": "string",
+                            "description": (
+                                "BRepName of the neutral face (e.g. 'Pad.1;2'). "
+                                "This is the fixed reference face for the draft and is "
+                                "also used as the Parting element. Use catia_list_faces "
+                                "to see available faces."
+                            ),
                         },
                         "pulling_direction": {
                             "type": "string",
-                            "description": "Pulling direction plane: 'xy', 'yz', 'zx'",
+                            "description": (
+                                "Pulling direction plane: 'xy', 'yz', 'zx'. "
+                                "The draft is pulled along the normal to this plane "
+                                "(xy -> +Z, yz -> +X, zx -> +Y)."
+                            ),
                             "enum": ["xy", "yz", "zx"],
                             "default": "xy",
                         },
                     },
-                    "required": ["angle"],
+                    "required": ["angle", "face_name", "neutral_face"],
                 },
             },
             {
@@ -373,6 +392,129 @@ class PartDesignTools:
                     "properties": {},
                 },
             },
+            {
+                "name": "catia_list_faces",
+                "description": (
+                    "List all faces of the active solid body with their BRepName identifiers "
+                    "and orientation labels for use with catia_draft (face to draft and neutral face)."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "catia_boolean_add",
+                "description": (
+                    "Boolean Add (Union): merge a reference body into the target body. "
+                    "The reference body's volume is added to the target body. "
+                    "Requires two separate Part Design bodies. The target body becomes the "
+                    "InWorkObject and the reference body is merged into it."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the reference body to add into the target body (e.g. 'Body.2').",
+                        },
+                        "target_body": {
+                            "type": "string",
+                            "description": "Name of the target body to modify. Defaults to the current InWorkObject / active body.",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
+            {
+                "name": "catia_boolean_remove",
+                "description": (
+                    "Boolean Remove (Cut): subtract the reference body's volume from the target body. "
+                    "Requires two separate Part Design bodies. The target body becomes the "
+                    "InWorkObject and the reference body is cut out of it."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the reference body to remove from the target body (e.g. 'Body.2').",
+                        },
+                        "target_body": {
+                            "type": "string",
+                            "description": "Name of the target body to modify. Defaults to the current InWorkObject / active body.",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
+            {
+                "name": "catia_boolean_intersect",
+                "description": (
+                    "Boolean Intersect: keep only the volume common to the target body and the "
+                    "reference body. Requires two separate Part Design bodies. The target body "
+                    "becomes the InWorkObject and is reduced to the intersection with the reference body."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the reference body to intersect with the target body (e.g. 'Body.2').",
+                        },
+                        "target_body": {
+                            "type": "string",
+                            "description": "Name of the target body to modify. Defaults to the current InWorkObject / active body.",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
+            {
+                "name": "catia_boolean_assemble",
+                "description": (
+                    "Boolean Assemble: assemble the reference body into the target body as a "
+                    "separate, non-merged component. Unlike Add, Assemble keeps the reference "
+                    "body as a distinct sub-body within the target. Requires two separate Part "
+                    "Design bodies. The target body becomes the InWorkObject."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the reference body to assemble into the target body (e.g. 'Body.2').",
+                        },
+                        "target_body": {
+                            "type": "string",
+                            "description": "Name of the target body to modify. Defaults to the current InWorkObject / active body.",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
+            {
+                "name": "catia_boolean_union_trim",
+                "description": (
+                    "Boolean Union Trim: union the reference body with the target body and trim "
+                    "the result, removing the overlapping volume between them. Requires two "
+                    "separate Part Design bodies. The target body becomes the InWorkObject."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the reference body to union-trim with the target body (e.g. 'Body.2').",
+                        },
+                        "target_body": {
+                            "type": "string",
+                            "description": "Name of the target body to modify. Defaults to the current InWorkObject / active body.",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
         ]
 
     def execute(self, tool_name: str, arguments: dict[str, Any]) -> str:
@@ -407,6 +549,18 @@ class PartDesignTools:
                 return self._list_features()
             case "catia_list_edges":
                 return self._list_edges()
+            case "catia_list_faces":
+                return self._list_faces()
+            case "catia_boolean_add":
+                return self._boolean_add(arguments)
+            case "catia_boolean_remove":
+                return self._boolean_remove(arguments)
+            case "catia_boolean_intersect":
+                return self._boolean_intersect(arguments)
+            case "catia_boolean_assemble":
+                return self._boolean_assemble(arguments)
+            case "catia_boolean_union_trim":
+                return self._boolean_union_trim(arguments)
             case _:
                 raise ValueError(f"Unknown part design tool: {tool_name}")
 
@@ -511,43 +665,34 @@ class PartDesignTools:
         return f"Groove (revolution cut) created: {angle}°. Feature: '{groove.Name}'"
 
     def _fillet(self, args: dict[str, Any]) -> str:
-        self.conn.ensure_connected()
-        part = self.conn.get_active_part()
-        body = self.conn.get_active_part_body()
-        sf = part.ShapeFactory
+        """Create a Fillet on edges.
 
-        radius = args["radius"]
+        NOTE: This requires a 'References' collection to pass edge selections to the
+        CATIA API. The 'References' collection type is NOT accessible through COM
+        late-binding (pywin32 or VBScript). This is a fundamental CATIA V5 COM API
+        limitation when the type library is not registered for automation.
 
-        fillet = sf.AddNewSolidEdgeFilletWithConstantRadius(
-            self._get_last_shape(),
-            1,       # catTangencyFilletEdgePropagation
-            radius,
+        Workaround: Use CATIA's GUI (Insert > Dressed Up > Edge Fillet) manually.
+        """
+        raise NotImplementedError(
+            "catia_fillet is not supported through COM automation. "
+            "The CATIA API requires a 'References' collection (part.References) to pass "
+            "edge selections to AddNewSolidEdgeFilletWithConstantRadius, but this collection "
+            "is not accessible through COM late-binding. "
+            "Use CATIA's GUI: Insert > Dressed Up > Edge Fillet."
         )
-
-        part.UpdateObject(fillet)
-        self.conn.refresh_display()
-        return f"Fillet created: R{radius} mm. Feature: '{fillet.Name}'"
 
     def _chamfer(self, args: dict[str, Any]) -> str:
-        self.conn.ensure_connected()
-        part = self.conn.get_active_part()
-        body = self.conn.get_active_part_body()
-        sf = part.ShapeFactory
+        """Create a Chamfer on edges.
 
-        length = args["length"]
-        angle = args.get("angle", 45)
-
-        chamfer = sf.AddNewChamfer(
-            self._get_last_shape(),
-            1,       # catTangencyChamferPropagation
-            0,       # catLengthAngleChamfer mode
-            length,
-            angle,
+        NOTE: Same limitation as _fillet - requires References collection.
+        """
+        raise NotImplementedError(
+            "catia_chamfer is not supported through COM automation. "
+            "The CATIA API requires a 'References' collection to pass edge selections "
+            "to AddNewChamfer, but this collection is not accessible through COM late-binding. "
+            "Use CATIA's GUI: Insert > Dressed Up > Chamfer."
         )
-
-        part.UpdateObject(chamfer)
-        self.conn.refresh_display()
-        return f"Chamfer created: {length} mm at {angle}°. Feature: '{chamfer.Name}'"
 
     def _hole(self, args: dict[str, Any]) -> str:
         self.conn.ensure_connected()
@@ -645,49 +790,109 @@ class PartDesignTools:
         self.conn.refresh_display()
         return f"Mirror created about {plane_key.upper()} plane. Feature: '{mirror.Name}'"
 
+    def _draft(self, args: dict[str, Any]) -> str:
+        """Create a Draft angle on faces.
+
+        Draft is supported through the available CATIA COM interface. The required
+        neutral Reference must also be supplied as the Parting argument. Passing
+        None as Parting causes UpdateObject failure.
+
+        Verified signature (via ShapeFactory):
+            sf.AddNewDraft(face_ref, neutral_ref, 0, neutral_ref,
+                           dir_x, dir_y, dir_z, 0, angle, 0)
+        where:
+            face_ref     = face to draft (Reference)
+            neutral_ref  = neutral element (Reference)
+            0            = mode (catStandardDraftMode)
+            neutral_ref  = parting element (MUST equal neutral_ref, not None)
+            dir_x/y/z    = pulling direction vector
+            0            = direction/mode parameter
+            angle        = draft angle (degrees)
+            0            = multiselection mode
+
+        Both face references are resolved independently via
+        part.CreateReferenceFromBRepName(bn, body). The neutral face is never
+        inferred from the draft face.
+        """
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        body = self.conn.get_active_part_body()
+        sf = part.ShapeFactory
+
+        face_name = args.get("face_name")
+        neutral_face = args.get("neutral_face")
+        angle = args["angle"]
+        pulling_direction = args.get("pulling_direction", "xy")
+
+        if not face_name:
+            raise ValueError(
+                "face_name is required: the BRepName of the face to draft "
+                "(e.g. 'Pad.1;3'). Use catia_list_faces to see available faces."
+            )
+        if not neutral_face:
+            raise ValueError(
+                "neutral_face is required: the BRepName of the neutral face "
+                "(e.g. 'Pad.1;2'). Use catia_list_faces to see available faces."
+            )
+
+        # Resolve both references independently (never infer neutral from draft face).
+        face_ref = part.CreateReferenceFromBRepName(face_name, body)
+        neutral_ref = part.CreateReferenceFromBRepName(neutral_face, body)
+
+        # Map pulling direction plane to a direction vector (normal to the plane).
+        dir_map = {
+            "xy": (0.0, 0.0, 1.0),  # normal to xy plane -> +Z
+            "yz": (1.0, 0.0, 0.0),  # normal to yz plane -> +X
+            "zx": (0.0, 1.0, 0.0),  # normal to zx plane -> +Y
+        }
+        if pulling_direction not in dir_map:
+            raise ValueError(
+                f"Unknown pulling_direction '{pulling_direction}'. Use 'xy', 'yz', or 'zx'."
+            )
+        dx, dy, dz = dir_map[pulling_direction]
+
+        # Verified signature: parting must be the neutral reference (not None).
+        draft = sf.AddNewDraft(
+            face_ref, neutral_ref, 0, neutral_ref, dx, dy, dz, 0, angle, 0
+        )
+        part.UpdateObject(draft)
+        self.conn.refresh_display()
+        return (
+            f"Draft created: {angle} deg on face '{face_name}' with neutral "
+            f"'{neutral_face}', pulling {pulling_direction}. Feature: '{draft.Name}'"
+        )
+
     def _shell(self, args: dict[str, Any]) -> str:
+        """Create a Shell (hollow) feature.
+
+        Uses ShapeFactory.AddNewShell(face_ref, thickness, orientation) which is
+        accessible through COM. The face(s) to remove create openings in the shell.
+        """
         self.conn.ensure_connected()
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
 
         thickness = args["thickness"]
-        shell = sf.AddNewShell(self._get_last_shape(), 0, thickness, thickness)
+        faces_to_remove = args.get("faces_to_remove") or []
 
-        # Remove specified faces if any
-        faces_to_remove = args.get("faces_to_remove", [])
-        for face_name in faces_to_remove:
-            try:
-                face = body.Shapes.Item(face_name) if face_name else None
-                if face:
-                    shell.AddFaceToRemove(part.CreateReferenceFromObject(face))
-            except Exception:
-                pass
+        if not faces_to_remove:
+            raise ValueError(
+                "faces_to_remove is required: at least one face must be removed to "
+                "create an opening. Use catia_list_faces to see available faces."
+            )
 
+        # Create a reference for the first face to remove.
+        face_name = faces_to_remove[0]
+        face_ref = part.CreateReferenceFromBRepName(face_name, body)
+
+        shell = sf.AddNewShell(face_ref, thickness, 0)
         part.UpdateObject(shell)
         self.conn.refresh_display()
-        return f"Shell created: {thickness} mm wall thickness. Feature: '{shell.Name}'"
-
-    def _draft(self, args: dict[str, Any]) -> str:
-        self.conn.ensure_connected()
-        part = self.conn.get_active_part()
-        body = self.conn.get_active_part_body()
-        sf = part.ShapeFactory
-
-        angle = args["angle"]
-
-        plane_key = args.get("pulling_direction", "xy").lower()
-        planes = self.conn.get_origin_elements()
-        neutral = planes.get(plane_key)
-        if not neutral:
-            raise ValueError(f"Unknown pulling direction plane: {plane_key}")
-
-        neutral_ref = part.CreateReferenceFromObject(neutral)
-        draft = sf.AddNewDraft(self._get_last_shape(), neutral_ref, angle)
-
-        part.UpdateObject(draft)
-        self.conn.refresh_display()
-        return f"Draft created: {angle}° angle. Feature: '{draft.Name}'"
+        return (
+            f"Shell created: {thickness} mm wall on feature '{shell.Name}' "
+            f"with opening on face '{face_name}'."
+        )
 
     def _thickness(self, args: dict[str, Any]) -> str:
         self.conn.ensure_connected()
@@ -701,6 +906,101 @@ class PartDesignTools:
         part.UpdateObject(thickness)
         self.conn.refresh_display()
         return f"Thickness added: {offset} mm offset. Feature: '{thickness.Name}'"
+
+    def _resolve_boolean_bodies(self, args: dict[str, Any]) -> tuple[Any, Any]:
+        """Resolve the target body and reference body for a Boolean op.
+
+        Returns (target_body, reference_body). The reference body is resolved by name
+        from args['body_name']. The target body defaults to the main PartBody, or can
+        be specified via args['target_body'].
+
+        NOTE: the target must be a Body, never the InWorkObject getter, which returns
+        the last feature (e.g. a Pad) rather than the body.
+        """
+        part = self.conn.get_active_part()
+        bodies = part.Bodies
+
+        body_name = args["body_name"]
+        target_name = args.get("target_body")
+
+        # Resolve reference body by name
+        reference_body = None
+        for i in range(1, bodies.Count + 1):
+            b = bodies.Item(i)
+            if b.Name == body_name:
+                reference_body = b
+                break
+        if reference_body is None:
+            raise RuntimeError(
+                f"Reference body '{body_name}' not found. Available bodies: "
+                + ", ".join(bodies.Item(i).Name for i in range(1, bodies.Count + 1))
+            )
+
+        # Resolve target body
+        if target_name:
+            target_body = None
+            for i in range(1, bodies.Count + 1):
+                b = bodies.Item(i)
+                if b.Name == target_name:
+                    target_body = b
+                    break
+            if target_body is None:
+                raise RuntimeError(f"Target body '{target_name}' not found.")
+        else:
+            # Default to the main body (the primary PartBody). NOTE: we must NOT
+            # use part.InWorkObject here, because its getter returns the last
+            # feature (e.g. a Pad), not the body. The Boolean target must be a Body.
+            target_body = part.MainBody
+
+        if target_body.Name == reference_body.Name:
+            raise RuntimeError(
+                "Target body and reference body must be different. "
+                "A Boolean operation requires two separate bodies."
+            )
+
+        return target_body, reference_body
+
+    def _boolean_op(self, args: dict[str, Any], method_name: str, op_label: str) -> str:
+        """Generic Boolean operation executor.
+
+        Sets the target body as InWorkObject, then calls the ShapeFactory Boolean
+        method (AddNewAdd / AddNewRemove / AddNewIntersect / AddNewAssemble /
+        AddNewTrim) with the reference body, then updates.
+        """
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        sf = part.ShapeFactory
+
+        target_body, reference_body = self._resolve_boolean_bodies(args)
+
+        # Set the target body as InWorkObject (required for Boolean ops)
+        part.InWorkObject = target_body
+
+        # Call the Boolean method
+        method = getattr(sf, method_name)
+        feature = method(reference_body)
+
+        part.UpdateObject(feature)
+        self.conn.refresh_display()
+        return (
+            f"Boolean {op_label} created: '{feature.Name}' "
+            f"({reference_body.Name} {op_label.lower()} into {target_body.Name})."
+        )
+
+    def _boolean_add(self, args: dict[str, Any]) -> str:
+        return self._boolean_op(args, "AddNewAdd", "Add")
+
+    def _boolean_remove(self, args: dict[str, Any]) -> str:
+        return self._boolean_op(args, "AddNewRemove", "Remove")
+
+    def _boolean_intersect(self, args: dict[str, Any]) -> str:
+        return self._boolean_op(args, "AddNewIntersect", "Intersect")
+
+    def _boolean_assemble(self, args: dict[str, Any]) -> str:
+        return self._boolean_op(args, "AddNewAssemble", "Assemble")
+
+    def _boolean_union_trim(self, args: dict[str, Any]) -> str:
+        return self._boolean_op(args, "AddNewTrim", "Union Trim")
 
     def _list_features(self) -> str:
         self.conn.ensure_connected()
@@ -747,3 +1047,102 @@ class PartDesignTools:
         if not edges:
             return "No edges found on the last feature"
         return json.dumps(edges, indent=2)
+
+    def _list_faces(self) -> str:
+        """List all faces of the active solid body with BRepName identifiers and
+        orientation labels for use with catia_draft."""
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        body = self.conn.get_active_part_body()
+
+        last_shape = self._get_last_shape()
+        faces = []
+        try:
+            sel = self.conn.hso
+            sel.Clear()
+            sel.Add(last_shape)
+            sel.Search("Topology.Face,sel")
+
+            for i in range(1, sel.Count + 1):
+                item = sel.Item(i)
+                # Get the face's full reference name. Prefer item.Value.Name (a proper
+                # Reference name when the gen_py cache is healthy); fall back to
+                # item.Reference.Name which is always a Reference object.
+                try:
+                    name = item.Value.Name
+                except Exception:
+                    try:
+                        name = item.Reference.Name
+                    except Exception:
+                        name = ""
+                # Extract the BRepName that CreateReferenceFromBRepName accepts.
+                # The working format is the content between 'Selection_RSur:(' and
+                # ');<Feature>_ResultOUT', e.g. 'Face:(Brp:(Pad.1;2);None:();Cf12:()'.
+                brep = name
+                start = name.find("Selection_RSur:(")
+                marker = ");" + last_shape.Name + "_ResultOUT"
+                end = name.find(marker)
+                if start >= 0 and end >= 0:
+                    start += len("Selection_RSur:(")
+                    brep = name[start:end]
+                # Orientation label via point-on-plane local frame normal
+                label = self._face_orientation_label(part, body, brep)
+                faces.append({
+                    "index": i,
+                    "brep_name": brep,
+                    "orientation": label,
+                })
+            sel.Clear()
+        except Exception as e:
+            return f"Could not enumerate faces: {e}. Use CATIA selection to identify face names."
+
+        if not faces:
+            return "No faces found on the last feature"
+        return json.dumps(faces, indent=2)
+
+    def _face_orientation_label(self, part: Any, body: Any, brep: str) -> str:
+        """Classify a face by its outward normal using the point-on-plane local frame.
+
+        Returns a label like TOP/BOTTOM/LEFT/RIGHT/FRONT/REAR or 'unknown'.
+        """
+        try:
+            ref = part.CreateReferenceFromBRepName(brep, body)
+            # Create a point on the plane at the face origin to read its local frame.
+            hsf = part.HybridShapeFactory
+            pt = hsf.AddNewPointOnPlane(ref, 0.5, 0.5)
+            # The point's plane local frame: FirstDirection (property) and
+            # GetSecondDirection() (method). Normal = First x Second.
+            fd = pt.FirstDirection
+            sd = pt.GetSecondDirection()
+
+            def _val(v):
+                try:
+                    return v.Value
+                except Exception:
+                    return v
+
+            fx, fy, fz = _val(fd.GetX()), _val(fd.GetY()), _val(fd.GetZ())
+            # GetSecondDirection() returns a tuple (x, y, z) directly in this
+            # environment, not a Direction object. Handle both.
+            if isinstance(sd, (tuple, list)):
+                sx, sy, sz = sd[0], sd[1], sd[2]
+            else:
+                sx, sy, sz = _val(sd.GetX()), _val(sd.GetY()), _val(sd.GetZ())
+            # Cross product
+            nx = fy * sz - fz * sy
+            ny = fz * sx - fx * sz
+            nz = fx * sy - fy * sx
+            # Normalize
+            mag = (nx * nx + ny * ny + nz * nz) ** 0.5
+            if mag < 1e-9:
+                return "unknown"
+            nx, ny, nz = nx / mag, ny / mag, nz / mag
+            # Map dominant axis
+            ax = max(abs(nx), abs(ny), abs(nz))
+            if abs(nx) == ax:
+                return "RIGHT" if nx > 0 else "LEFT"
+            if abs(ny) == ax:
+                return "REAR" if ny > 0 else "FRONT"
+            return "TOP" if nz > 0 else "BOTTOM"
+        except Exception:
+            return "unknown"

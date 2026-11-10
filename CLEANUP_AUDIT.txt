@@ -1,0 +1,366 @@
+================================================================================
+       CATIA V5 MCP SERVER — CLEANUP AUDIT REPORT
+       Generated: 2026-09-09
+================================================================================
+
+================================================================================
+SECTION A: REPOSITORY TREE (CLEANED)
+================================================================================
+
+catia-v5-mcp-server/
+├── .git/                          # Git repository
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                 # CI: runs test_server.py on Windows
+│       └── traffic.yml            # Daily traffic badge updater (needs PAT)
+├── .gitignore
+├── .venv/                         # ACTIVE virtual environment
+├── .venv.broken-lmstudio-20260903/   # BROKEN venv (Sep 3)
+├── .venv.broken-python312-20260824/  # BROKEN venv (Aug 24)
+├── catia_mcp/                     # ← CORE PACKAGE
+│   ├── __init__.py                #   version "0.1.0"
+│   ├── __main__.py                #   python -m catia_mcp
+│   ├── server.py                  #   MCP server, 8 tool modules
+│   ├── connection.py              #   CATIAConnection singleton
+│   └── tools/
+│       ├── __init__.py            #   exports 7 classes (MISSING KinematicsTools)
+│       ├── document.py            #   10 tools
+│       ├── sketcher.py            #   11 tools (has rectangle bug)
+│       ├── part_design.py         #   15 tools
+│       ├── gsd.py                 #   24 tools
+│       ├── assembly.py            #   9 tools
+│       ├── measurement.py         #   6 tools
+│       ├── export.py              #   4 tools
+│       └── kinematics.py          #   3 tools (NOT in tools/__init__.py)
+├── catia_v5_mcp_server.egg-info/ # Build artifact (from pip install -e .)
+├── scripts/                       # ← DEBUG/EXPERIMENT SCRIPTS
+│   ├── collect_traffic.py         #   Traffic collector (used by traffic.yml)
+│   ├── gsd_smoke_test.py          #   Runtime GSD test (referenced in CHANGELOG)
+│   ├── test_kinematics_mcp.py     #   Kinematics MCP test
+│   ├── test_kinematics_tool.py    #   Kinematics smoke test
+│   ├── kin_*.py (34 files)        #   All standalone COM probe/debug scripts
+│   ├── tlb_*.py (3 files)         #   Type library inspection scripts
+│   └── kinstrings.py              #   DLL string scanner
+├── traffic/                       # ← GITHUB ANALYTICS (NOT part of MCP server)
+│   ├── badge-clones.json
+│   ├── badge-views.json
+│   ├── chart.png
+│   ├── clones.csv / clones.json
+│   └── views.csv / views.json
+├── doghouse_*.py (88 files)       # ← ALL STANDALONE DEBUG SCRIPTS
+├── apply_thickness_macro.vb       # ← VBA macro (doghouse experiment)
+├── catia_mcp.log                  # ← RUNTIME LOG
+├── pyproject.toml                 # Build config, version "0.2.0"
+├── requirements.txt               # mcp, pywin32
+├── setup.sh                       # Auto-installer (Claude Desktop config)
+├── README.md                      # Documentation
+├── CHANGELOG.md                   # Release notes
+├── CONTRIBUTING.md                # Contribution guide
+└── LICENSE                        # MIT
+
+
+================================================================================
+SECTION B: FILE CLASSIFICATION
+================================================================================
+
+--- MUST KEEP: Core MCP Server (13 files) ---
+
+  catia_mcp/__init__.py             Package init
+  catia_mcp/__main__.py             Entry point (python -m catia_mcp)
+  catia_mcp/server.py               MCP server, tool registration & routing
+  catia_mcp/connection.py           COM connection singleton
+  catia_mcp/tools/__init__.py       Tool exports
+  catia_mcp/tools/document.py       DocumentTools
+  catia_mcp/tools/sketcher.py       SketcherTools
+  catia_mcp/tools/part_design.py    PartDesignTools
+  catia_mcp/tools/gsd.py            GSDTools
+  catia_mcp/tools/assembly.py       AssemblyTools
+  catia_mcp/tools/measurement.py    MeasurementTools
+  catia_mcp/tools/export.py         ExportTools
+  catia_mcp/tools/kinematics.py     KinematicsTools
+
+--- MUST KEEP: Build & Config (5 files) ---
+
+  pyproject.toml                    Build config, dependencies, entry point
+  requirements.txt                  Dependency list
+  setup.sh                          Auto-installer (referenced in README)
+  .gitignore                        Git ignore rules
+  LICENSE                           MIT license
+
+--- MUST KEEP: Documentation (3 files) ---
+
+  README.md                         Primary documentation
+  CHANGELOG.md                      Release history
+  CONTRIBUTING.md                   Contribution guidelines
+
+--- MUST KEEP: CI (1 file) ---
+
+  .github/workflows/ci.yml          Runs test_server.py on push/PR
+
+--- MUST KEEP: Tests (3 files) ---
+
+  scripts/gsd_smoke_test.py         Runtime GSD test (referenced in CHANGELOG)
+  scripts/test_kinematics_mcp.py    Kinematics MCP test
+  scripts/test_kinematics_tool.py   Kinematics smoke test
+
+
+--- SAFE TO DELETE: doghouse_*.py (88 files) ---
+
+  All 88 root-level doghouse_*.py scripts are standalone debug/experiment
+  scripts. They use raw win32com.client.GetActiveObject or CATIAConnection
+  directly, are NOT imported by anything, and were created during iterative
+  debugging sessions (doghouse_method, doghouse_phase2*, doghouse_phase3*,
+  doghouse_step4*, etc.).
+
+  Full list:
+    doghouse_delete_dup_pads.py
+    doghouse_final_verify.py
+    doghouse_fix_bool_remove.py
+    doghouse_fix_remove.py
+    doghouse_fix_remove2.py
+    doghouse_fix_thickness_correct.py
+    doghouse_fix_thickness_geom.py
+    doghouse_fix_thickness_inside.py
+    doghouse_fix_thickness_macro.py
+    doghouse_fix_thickness_method.py
+    doghouse_fix_thickness_method2.py
+    doghouse_fix_thickness_ref.py
+    doghouse_fix_thickness_search.py
+    doghouse_fix_thickness_startcmd.py
+    doghouse_fix_thickness_top.py
+    doghouse_fix_thickness_vba.py
+    doghouse_inspect_dg11_faces.py
+    doghouse_inspect_methods.py
+    doghouse_inspect_pads.py
+    doghouse_inspect_ref.py
+    doghouse_inspect_state.py
+    doghouse_inspect_thickness.py
+    doghouse_inspect_thickness2.py
+    doghouse_inspect_thickness3.py
+    doghouse_open_inspect.py
+    doghouse_phase1_setup.py
+    doghouse_phase2_geometry.py
+    doghouse_phase2b_inspect.py
+    doghouse_phase2c_investigate.py
+    doghouse_phase2d_draft_shell.py
+    doghouse_phase2e_faces.py
+    doghouse_phase2f_debug_faces.py
+    doghouse_phase2g_diag.py
+    doghouse_phase2h_rebuild.py
+    doghouse_phase2i_draft_shell.py
+    doghouse_phase2j_draft_shell.py
+    doghouse_phase2k_draft_shell.py
+    doghouse_phase2l_draft_shell.py
+    doghouse_phase2m_draft_shell.py
+    doghouse_phase2n_cleanup.py
+    doghouse_phase2o_cleanup.py
+    doghouse_phase2p_lifter_test.py
+    doghouse_phase2q_directions.py
+    doghouse_phase2r_lifter_front.py
+    doghouse_phase2s_lifter_neutral.py
+    doghouse_phase2t_tooling_shell.py
+    doghouse_phase2u_verify.py
+    doghouse_phase2v_diag_inner.py
+    doghouse_phase2w_early_binding.py
+    doghouse_phase2x_face_cog.py
+    doghouse_phase2y_feature_params.py
+    doghouse_phase2z_shell_internals.py
+    doghouse_phase3a_diag.py
+    doghouse_phase3b_inner_draft.py
+    doghouse_phase3b_probe_brep.py
+    doghouse_phase3b_probe_coords.py
+    doghouse_phase3b_probe_coords2.py
+    doghouse_phase3b_probe_draft.py
+    doghouse_phase3b_probe_draft2.py
+    doghouse_phase3b_probe_line.py
+    doghouse_phase3b_probe_names.py
+    doghouse_phase3b_probe_plane.py
+    doghouse_phase3b_probe_plane2.py
+    doghouse_phase3b_probe_plane3.py
+    doghouse_phase3b_probe_plane4.py
+    doghouse_phase3c_bool_remove.py
+    doghouse_phase3c_cleanup.py
+    doghouse_phase3c_coring.py
+    doghouse_phase3c_debug_draft.py
+    doghouse_phase3c_debug_faces.py
+    doghouse_phase3c_debug_params.py
+    doghouse_phase3c_debug_paste.py
+    doghouse_phase3c_debug_paste2.py
+    doghouse_phase3c_debug_paste3.py
+    doghouse_phase3c_debug_paste4.py
+    doghouse_phase3c_debug_shell.py
+    doghouse_phase3c_face_debug.py
+    doghouse_phase3c_face_debug2.py
+    doghouse_phase3c_face_ref_test.py
+    doghouse_phase3c_fix_thickness.py
+    doghouse_phase3c_pastespecial_test.py
+    doghouse_phase3c_probe_doc.py
+    doghouse_phase4_debug_edges.py
+    doghouse_phase4_fillets.py
+    doghouse_save.py
+    doghouse_step4_draft.py
+    doghouse_step4_list_faces.py
+    doghouse_step4_mcp_first.py
+    doghouse_step4_read_dirs.py
+    doghouse_step4_verify.py
+    doghouse_step5_debug_normal.py
+    doghouse_step5_discover_front.py
+    doghouse_step5_draft.py
+    doghouse_step5_execute.py
+    doghouse_step5_inspect.py
+    doghouse_step5b_execute.py
+    doghouse_step5b_inspect.py
+    doghouse_verify_pad_length.py
+
+
+--- SAFE TO DELETE: scripts/ debug scripts (38 files) ---
+
+  All 34 kin_*.py scripts are standalone COM probe/debug scripts for the
+  kinematics API. The 3 tlb_*.py scripts dump CATIA type library info.
+  kinstrings.py scans DLLs for joint-type strings. None are imported by
+  anything.
+
+  Full list:
+    kin_add_pin.py
+    kin_addcommand_probe.py
+    kin_classify_geom.py
+    kin_diag.py
+    kin_existing_revolute.py
+    kin_export_probe.py
+    kin_find_part1.py
+    kin_iges_proof.py
+    kin_iges_proof2.py
+    kin_inspect_existing.py
+    kin_inspect_openwork_part.py
+    kin_inspect_sketch.py
+    kin_motion_probe2.py
+    kin_order_probe.py
+    kin_probe.py
+    kin_probe2.py through kin_probe12.py (11 files)
+    kin_revolute_final.py
+    kin_revolute_helper.py
+    kin_revolute_motion.py
+    kin_revolute_verify.py
+    kin_stl_proof.py
+    tlb_dump.py
+    tlb_kin.py
+    tlb_scan.py
+    kinstrings.py
+
+
+--- SAFE TO DELETE: Build Artifacts ---
+
+  catia_v5_mcp_server.egg-info/       Generated by pip install -e .
+  .venv.broken-lmstudio-20260903/     Abandoned broken venv
+  .venv.broken-python312-20260824/    Abandoned broken venv
+  catia_mcp.log                       Runtime log (in .gitignore but on disk)
+
+
+--- SAFE TO DELETE: Misc Debug/Experiment ---
+
+  apply_thickness_macro.vb            VBA macro experiment for doghouse debugging
+
+
+--- SAFE TO DELETE (BUNDLE): GitHub Analytics System ---
+
+  .github/workflows/traffic.yml       Traffic badge workflow (needs PAT)
+  scripts/collect_traffic.py           Script used by traffic.yml
+  traffic/                             GitHub analytics data directory
+    badge-clones.json
+    badge-views.json
+    chart.png
+    clones.csv
+    clones.json
+    views.csv
+    views.json
+
+  NOTE: traffic.yml calls collect_traffic.py which writes to traffic/.
+        All three must be deleted together or kept together.
+
+
+================================================================================
+SECTION C: INCONSISTENCIES & BUGS FOUND
+================================================================================
+
+  #   Issue                                          Severity  Location
+  --  ----------------------------------------------  --------  ---------------------------
+  1   KinematicsTools missing from tools/__init__.py  Medium    tools/__init__.py
+      server.py imports it but __init__.py doesn't
+      list it. Works at runtime because server.py
+      imports directly, but inconsistent with the
+      7 other modules.
+
+  2   Version mismatch                                Low       catia_mcp/__init__.py
+      pyproject.toml says 0.2.0, __init__.py says
+      0.1.0
+
+  3   test_server.py referenced in CI but missing     High      .github/workflows/ci.yml
+      CI runs "python test_server.py" but the file
+      does not exist in the repo. CI will always
+      fail on this step.
+
+  4   README says 78 tools, actual count is ~91       Low       README.md
+      README doesn't account for KinematicsTools (3),
+      catia_list_faces, catia_update_part,
+      catia_get_active_document_info, catia_list_documents, etc.
+
+  5   Rectangle bug                                   High      tools/sketcher.py
+      catia_create_rectangle uses 4 separate CreateLine
+      calls producing open lines, not a closed profile.
+      Pad/Pocket require closed profiles.
+
+  6   README mentions catia_sketch_centered_rectangle  Medium    README.md vs tools/sketcher.py
+      (line 193) but this tool does NOT exist in
+      sketcher.py
+
+
+================================================================================
+SECTION D: RECOMMENDED PRE-ANTIGRAVITY FIXES
+================================================================================
+
+  1. Fix tools/__init__.py — add KinematicsTools to the exports
+
+  2. Fix version — update __init__.py to "0.2.0" (or vice versa)
+
+  3. Fix or remove test_server.py reference — either create it or update
+     CI to reference scripts/test_kinematics_tool.py / scripts/gsd_smoke_test.py
+
+  4. Fix rectangle tool — use Factory2D.CreateClosedByPoints or
+     CreateRectangle for a proper closed profile
+
+  5. Update README tool counts to match actual (~91 tools)
+
+  6. Remove catia_sketch_centered_rectangle from README (doesn't exist)
+     or implement it
+
+
+================================================================================
+SECTION E: DELETE SUMMARY
+================================================================================
+
+  Category                              Count      Safe?
+  ------------------------------------  ---------  -----
+  doghouse_*.py                         88 files   Yes
+  scripts/kin_*.py                      34 files   Yes
+  scripts/tlb_*.py                      3 files    Yes
+  scripts/kinstrings.py                 1 file     Yes
+  apply_thickness_macro.vb              1 file     Yes
+  catia_mcp.log                         1 file     Yes
+  catia_v5_mcp_server.egg-info/         1 dir      Yes
+  .venv.broken-*                        2 dirs     Yes
+  traffic/                              7 files    Yes
+  .github/workflows/traffic.yml         1 file     Yes
+  scripts/collect_traffic.py            1 file     Yes
+  ------------------------------------  ---------  -----
+  TOTAL                                 ~140 items
+
+  Files remaining after cleanup: ~25
+    13 core MCP server files
+     5 build/config files
+     3 documentation files
+     1 CI workflow file
+     3 test files
+
+================================================================================
+END OF AUDIT
+================================================================================
