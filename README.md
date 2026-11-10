@@ -305,6 +305,16 @@ This project is open-source. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelin
 - **Tests** with COM mocking
 - **3DEXPERIENCE** CATIA support
 
+## Remote & Dual-Transport MCP Access
+
+In addition to the standard local STDIO transport, this server includes a **Streamable HTTP** remote transport supporting:
+- Secure remote CAD operations with **Bearer-token authentication**.
+- Process-global **single-writer execution lock** preventing concurrent CAD conflicts between local and remote clients.
+- Compatible with **Google Antigravity**, **OpenWork**, **OpenCode**, **Claude Desktop / Claude Code**, and **Gemini API**.
+- Secure remote tunneling via **Cloudflare Tunnel** or **Tailscale**.
+
+For full configuration, scripts, and deployment instructions, see **[REMOTE_MCP_README.md](REMOTE_MCP_README.md)**.
+
 ## License
 
 MIT
