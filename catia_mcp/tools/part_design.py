@@ -351,6 +351,14 @@ class PartDesignTools:
                             "enum": ["xy", "yz", "zx"],
                             "default": "xy",
                         },
+                        "parting_face": {
+                            "type": "string",
+                            "description": (
+                                "Optional BRepName of the parting element. Defaults to "
+                                "neutral_face if omitted. Override when the neutral face "
+                                "is parallel to the pulling direction (e.g. lifter draft)."
+                            ),
+                        },
                     },
                     "required": ["angle", "face_name", "neutral_face"],
                 },
@@ -358,8 +366,10 @@ class PartDesignTools:
             {
                 "name": "catia_thickness",
                 "description": (
-                    "Add or remove thickness from faces of a solid. "
-                    "Offsets faces inward or outward."
+                    "Add or remove thickness from a face of a solid. "
+                    "Offsets the selected face inward or outward. Use "
+                    "catia_list_faces to discover available BRepName identifiers. "
+                    "Negative values remove material inward; positive add outward."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -370,10 +380,53 @@ class PartDesignTools:
                         },
                         "face_name": {
                             "type": "string",
-                            "description": "Name of the face to offset",
+                            "description": (
+                                "BRepName of the face to offset (e.g. 'Pad.1;3'). "
+                                "Use catia_list_faces to see available faces."
+                            ),
                         },
                     },
-                    "required": ["offset"],
+                    "required": ["offset", "face_name"],
+                },
+            },
+            {
+                "name": "catia_split_solid",
+                "description": (
+                    "Split the active solid body with a plane or surface, removing "
+                    "the material on one side of the splitting element. The splitting "
+                    "element can be a named plane/surface in a geometrical set "
+                    "(e.g. 'Plane.1', 'SplitSurface') or an origin plane "
+                    "('xy', 'yz', 'zx'). The 'side' parameter selects which side of "
+                    "the splitting element is removed: 'positive' removes material in "
+                    "the direction of the element's normal vector, 'negative' removes "
+                    "the opposite side. The splitting element must fully intersect "
+                    "the solid."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "splitting_element": {
+                            "type": "string",
+                            "description": (
+                                "Name of the splitting element: a plane or surface in "
+                                "a geometrical set (e.g. 'Plane.1'), or an origin plane "
+                                "('xy', 'yz', 'zx'). Use catia_gsd_list_elements to see "
+                                "available element names."
+                            ),
+                        },
+                        "side": {
+                            "type": "string",
+                            "description": (
+                                "Which side of the splitting element is removed: "
+                                "'positive' (default) removes material in the direction "
+                                "of the element's normal vector, 'negative' removes the "
+                                "opposite side."
+                            ),
+                            "enum": ["positive", "negative"],
+                            "default": "positive",
+                        },
+                    },
+                    "required": ["splitting_element"],
                 },
             },
             {
@@ -515,6 +568,57 @@ class PartDesignTools:
                     "required": ["body_name"],
                 },
             },
+            {
+                "name": "catia_create_body",
+                "description": (
+                    "Create a new Part Design Body (e.g. DOG_HOUSE_1, DG_1.1, DG_1.2, "
+                    "PLASTIC_BODY). The new body becomes the active InWorkObject, so "
+                    "subsequent sketches and Part Design features are created inside it. "
+                    "This is a solid Part Design Body (not a Geometrical Set) and can be "
+                    "used in Boolean operations."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name for the new body (e.g. 'DOG_HOUSE_1'). If omitted, CATIA assigns a default name.",
+                        },
+                    },
+                },
+            },
+            {
+                "name": "catia_set_active_body",
+                "description": (
+                    "Set the active InWorkObject to an existing Part Design Body by name. "
+                    "Use this to switch between the host PartBody and construction bodies "
+                    "(DOG_HOUSE_1, DG_1.1, ...) before creating features. Verifies the "
+                    "body exists and reports the new active body."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "body_name": {
+                            "type": "string",
+                            "description": "Name of the Part Design Body to make active (e.g. 'PartBody', 'DOG_HOUSE_1').",
+                        },
+                    },
+                    "required": ["body_name"],
+                },
+            },
+            {
+                "name": "catia_list_bodies",
+                "description": (
+                    "List all Part Design Bodies in the active part with their names, "
+                    "feature counts, and which one is the current active InWorkObject. "
+                    "Use this to verify the correct body is active before creating "
+                    "Part Design features."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
         ]
 
     def execute(self, tool_name: str, arguments: dict[str, Any]) -> str:
@@ -545,6 +649,8 @@ class PartDesignTools:
                 return self._draft(arguments)
             case "catia_thickness":
                 return self._thickness(arguments)
+            case "catia_split_solid":
+                return self._split_solid(arguments)
             case "catia_list_features":
                 return self._list_features()
             case "catia_list_edges":
@@ -561,6 +667,12 @@ class PartDesignTools:
                 return self._boolean_assemble(arguments)
             case "catia_boolean_union_trim":
                 return self._boolean_union_trim(arguments)
+            case "catia_create_body":
+                return self._create_body(arguments)
+            case "catia_set_active_body":
+                return self._set_active_body(arguments)
+            case "catia_list_bodies":
+                return self._list_bodies()
             case _:
                 raise ValueError(f"Unknown part design tool: {tool_name}")
 
@@ -595,6 +707,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         sketch = self._get_last_sketch(args.get("sketch_name"))
         height = args["height"]
@@ -619,6 +734,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         sketch = self._get_last_sketch(args.get("sketch_name"))
         depth = args["depth"]
@@ -637,6 +755,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         sketch = self._get_last_sketch(args.get("sketch_name"))
         angle = args.get("angle", 360)
@@ -653,6 +774,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         sketch = self._get_last_sketch(args.get("sketch_name"))
         angle = args.get("angle", 360)
@@ -699,6 +823,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         sketch = self._get_last_sketch(args.get("sketch_name"))
         diameter = args["diameter"]
@@ -720,6 +847,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         feature = self._get_last_shape(args.get("feature_name"))
         d1_count = args["dir1_count"]
@@ -747,6 +877,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         feature = self._get_last_shape(args.get("feature_name"))
         count = args["count"]
@@ -774,6 +907,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         plane_key = args["plane"].lower()
         planes = self.conn.get_origin_elements()
@@ -794,17 +930,21 @@ class PartDesignTools:
         """Create a Draft angle on faces.
 
         Draft is supported through the available CATIA COM interface. The required
-        neutral Reference must also be supplied as the Parting argument. Passing
-        None as Parting causes UpdateObject failure.
+        neutral Reference must also be supplied as the Parting argument unless
+        parting_face is provided. Passing None as Parting causes UpdateObject failure.
+
+        Optional parting_face BRepName overrides the Parting element (defaults to
+        neutral_face). Use this when the neutral face is parallel to the pulling
+        direction (e.g. lifter draft with +Y pulling and TOP neutral).
 
         Verified signature (via ShapeFactory):
-            sf.AddNewDraft(face_ref, neutral_ref, 0, neutral_ref,
+            sf.AddNewDraft(face_ref, neutral_ref, 0, parting_ref,
                            dir_x, dir_y, dir_z, 0, angle, 0)
         where:
             face_ref     = face to draft (Reference)
             neutral_ref  = neutral element (Reference)
             0            = mode (catStandardDraftMode)
-            neutral_ref  = parting element (MUST equal neutral_ref, not None)
+            parting_ref  = parting element (defaults to neutral_ref)
             dir_x/y/z    = pulling direction vector
             0            = direction/mode parameter
             angle        = draft angle (degrees)
@@ -818,9 +958,13 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         face_name = args.get("face_name")
         neutral_face = args.get("neutral_face")
+        parting_face = args.get("parting_face")  # optional; defaults to neutral_face
         angle = args["angle"]
         pulling_direction = args.get("pulling_direction", "xy")
 
@@ -835,9 +979,12 @@ class PartDesignTools:
                 "(e.g. 'Pad.1;2'). Use catia_list_faces to see available faces."
             )
 
-        # Resolve both references independently (never infer neutral from draft face).
+        # Resolve references independently (never infer neutral from draft face).
         face_ref = part.CreateReferenceFromBRepName(face_name, body)
         neutral_ref = part.CreateReferenceFromBRepName(neutral_face, body)
+        # Parting element: try None first (CATIA default), fall back to
+        # neutral_ref if None causes UpdateObject failure.
+        parting_ref = None
 
         # Map pulling direction plane to a direction vector (normal to the plane).
         dir_map = {
@@ -851,9 +998,9 @@ class PartDesignTools:
             )
         dx, dy, dz = dir_map[pulling_direction]
 
-        # Verified signature: parting must be the neutral reference (not None).
+        # Test signature: Parting=None, Limiting=None (both default).
         draft = sf.AddNewDraft(
-            face_ref, neutral_ref, 0, neutral_ref, dx, dy, dz, 0, angle, 0
+            face_ref, neutral_ref, 0, parting_ref, dx, dy, dz, 0, angle, 0
         )
         part.UpdateObject(draft)
         self.conn.refresh_display()
@@ -872,6 +1019,9 @@ class PartDesignTools:
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         thickness = args["thickness"]
         faces_to_remove = args.get("faces_to_remove") or []
@@ -895,17 +1045,119 @@ class PartDesignTools:
         )
 
     def _thickness(self, args: dict[str, Any]) -> str:
+        """Add or remove thickness from a face of a solid.
+
+        Uses ShapeFactory.AddNewThickness(face_ref, offset) where face_ref is
+        a Reference created from a BRepName identifier.
+
+        NOTE: this CATIA version's AddNewThickness takes exactly 2 positional
+        args (Reference + offset), not 3 (Reference + inside + outside).
+        Positive offset adds material outward; negative removes inward.
+        """
         self.conn.ensure_connected()
         part = self.conn.get_active_part()
         body = self.conn.get_active_part_body()
         sf = part.ShapeFactory
+        # ShapeFactory targets the part's InWorkObject; ensure it is the active body.
+        # A geometrical set as InWorkObject (e.g. after GSD operations) causes E_FAIL.
+        part.InWorkObject = self.conn.get_active_part_body()
 
         offset = args["offset"]
-        thickness = sf.AddNewThickness(self._get_last_shape(), 0, offset)
+        face_name = args["face_name"]
+
+        if not face_name:
+            raise ValueError(
+                "face_name is required: the BRepName of the face to offset "
+                "(e.g. 'Pad.1;3'). Use catia_list_faces to see available faces."
+            )
+
+        # Create a proper Reference from the BRepName — passing a raw shape
+        # object causes AddNewThickness to misinterpret arguments.
+        face_ref = part.CreateReferenceFromBRepName(face_name, body)
+
+        # CRITICAL: this CATIA version's AddNewThickness takes exactly 2
+        # positional args (Reference + offset), NOT 3 (Reference + inside +
+        # outside).  The 3-arg signature causes:
+        #   TypeError: AddNewThickness() takes from 1 to 3 positional
+        #   arguments but 4 were given
+        thickness = sf.AddNewThickness(face_ref, offset)
 
         part.UpdateObject(thickness)
         self.conn.refresh_display()
-        return f"Thickness added: {offset} mm offset. Feature: '{thickness.Name}'"
+        return (
+            f"Thickness added: {offset} mm offset on face '{face_name}'. "
+            f"Feature: '{thickness.Name}'"
+        )
+
+    def _split_solid(self, args: dict[str, Any]) -> str:
+        """Split the active solid body with a plane or surface.
+
+        Uses ShapeFactory.AddNewSplit(splitting_ref, side) where side is the
+        CatSplitSide enum (1 = catPositiveSide, 2 = catNegativeSide).
+
+        CRITICAL: the ShapeFactory targets the part's InWorkObject. If the
+        InWorkObject is a geometrical set (e.g. after creating GSD elements),
+        AddNewSplit fails with E_FAIL. The InWorkObject must be set to the
+        MainBody before calling AddNewSplit.
+        """
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        sf = part.ShapeFactory
+
+        element_name = args["splitting_element"]
+        side = args.get("side", "positive")
+
+        # Resolve the splitting element (origin plane alias or hybrid shape)
+        element = self._find_splitting_element(part, element_name)
+        ref = part.CreateReferenceFromObject(element)
+
+        # Map side to CatSplitSide enum (verified: 1 removes material in the
+        # direction of the splitting element's normal vector)
+        side_map = {"positive": 1, "negative": 2}
+        side_value = side_map[side]
+
+        # CRITICAL: set InWorkObject to the active body — the ShapeFactory targets
+        # the InWorkObject, and a geometrical set cannot be split (E_FAIL).
+        part.InWorkObject = self.conn.get_active_part_body()
+
+        split = sf.AddNewSplit(ref, side_value)
+        part.UpdateObject(split)
+        self.conn.refresh_display()
+        return (
+            f"Split created: solid split by '{element_name}', "
+            f"removed {side} side. Feature: '{split.Name}'"
+        )
+
+    def _find_splitting_element(self, part: Any, name: str) -> Any:
+        """Find a splitting element by name: origin plane alias or hybrid shape.
+
+        Search order: origin planes (xy/yz/zx aliases), then hybrid shapes in
+        all geometrical sets (nested included).
+        """
+        key = name.lower()
+        plane_map = {"xy": "PlaneXY", "yz": "PlaneYZ", "zx": "PlaneZX"}
+        if key in plane_map:
+            return getattr(part.OriginElements, plane_map[key])
+
+        def iter_geosets(hbs):
+            for i in range(1, hbs.Count + 1):
+                hb = hbs.Item(i)
+                yield hb
+                try:
+                    yield from iter_geosets(hb.HybridBodies)
+                except Exception:
+                    pass
+
+        for hb in iter_geosets(part.HybridBodies):
+            try:
+                return hb.HybridShapes.Item(name)
+            except Exception:
+                pass
+
+        raise RuntimeError(
+            f"Splitting element '{name}' not found. Use a plane/surface name from "
+            "catia_gsd_list_elements, or an origin plane ('xy', 'yz', 'zx')."
+        )
 
     def _resolve_boolean_bodies(self, args: dict[str, Any]) -> tuple[Any, Any]:
         """Resolve the target body and reference body for a Boolean op.
@@ -1001,6 +1253,92 @@ class PartDesignTools:
 
     def _boolean_union_trim(self, args: dict[str, Any]) -> str:
         return self._boolean_op(args, "AddNewTrim", "Union Trim")
+
+    def _create_body(self, args: dict[str, Any]) -> str:
+        """Create a new Part Design Body and make it the active InWorkObject."""
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+
+        new_body = part.Bodies.Add()
+        if args.get("name"):
+            new_body.Name = args["name"]
+
+        # Make the new body the active InWorkObject so subsequent sketches and
+        # Part Design features land inside it.
+        part.InWorkObject = new_body
+        part.UpdateObject(new_body)
+        self.conn.refresh_display()
+
+        return (
+            f"Part Design Body created: '{new_body.Name}'. "
+            f"Active InWorkObject set to '{new_body.Name}'."
+        )
+
+    def _set_active_body(self, args: dict[str, Any]) -> str:
+        """Set the active InWorkObject to an existing Part Design Body by name."""
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        body_name = args["body_name"]
+
+        bodies = part.Bodies
+        target = None
+        for i in range(1, bodies.Count + 1):
+            b = bodies.Item(i)
+            if b.Name == body_name:
+                target = b
+                break
+        if target is None:
+            available = ", ".join(
+                bodies.Item(i).Name for i in range(1, bodies.Count + 1)
+            )
+            raise RuntimeError(
+                f"Body '{body_name}' not found. Available Part Design bodies: {available}"
+            )
+
+        part.InWorkObject = target
+        self.conn.refresh_display()
+        return f"Active InWorkObject set to Part Design Body '{target.Name}'."
+
+    def _list_bodies(self) -> str:
+        """List all Part Design Bodies with feature counts and the active one."""
+        self.conn.ensure_connected()
+        part = self.conn.get_active_part()
+        bodies = part.Bodies
+
+        # The InWorkObject getter returns the last feature (e.g. a Pad) or the
+        # body itself when one was explicitly set. Identify the active body by
+        # checking whether the InWorkObject IS a body or belongs to one.
+        active_feature = None
+        try:
+            active_feature = part.InWorkObject
+        except Exception:
+            pass
+
+        result = []
+        for i in range(1, bodies.Count + 1):
+            b = bodies.Item(i)
+            shapes = b.Shapes
+            count = shapes.Count
+            is_active = False
+            if active_feature is not None:
+                try:
+                    if hasattr(active_feature, "Shapes") and active_feature.Name == b.Name:
+                        is_active = True
+                    else:
+                        for j in range(1, count + 1):
+                            if shapes.Item(j).Name == active_feature.Name:
+                                is_active = True
+                                break
+                except Exception:
+                    pass
+            result.append({
+                "index": i,
+                "name": b.Name,
+                "feature_count": count,
+                "active": is_active,
+            })
+
+        return json.dumps(result, indent=2)
 
     def _list_features(self) -> str:
         self.conn.ensure_connected()
