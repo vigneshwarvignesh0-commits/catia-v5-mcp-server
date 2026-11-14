@@ -5,6 +5,7 @@ from catia_mcp.tools.sketcher import SketcherTools
 from catia_mcp.tools.part_design import PartDesignTools
 from catia_mcp.tools.gsd import GSDTools
 from catia_mcp.tools.assembly import AssemblyTools
+from catia_mcp.tools.diagnostics import DiagnosticsTools
 from catia_mcp.tools.measurement import MeasurementTools
 from catia_mcp.tools.kinematics import KinematicsTools
 from catia_mcp.tools.export import ExportTools
@@ -15,6 +16,7 @@ __all__ = [
     "PartDesignTools",
     "GSDTools",
     "AssemblyTools",
+    "DiagnosticsTools",
     "MeasurementTools",
     "KinematicsTools",
     "ExportTools",
