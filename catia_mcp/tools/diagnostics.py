@@ -84,8 +84,9 @@ class DiagnosticsTools:
                     "actually exposed. Run this first when tools fail with "
                     "UNSUPPORTED_CAPABILITY, and include its output when "
                     "reporting compatibility issues. Probing factories requires "
-                    "an active Part document; without one, only "
-                    "application-level info is reported."
+                    "an active Part document; if none is open, a temporary "
+                    "scratch Part is created automatically so factory "
+                    "diagnostics always run."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -107,10 +108,45 @@ class DiagnosticsTools:
 
         report: dict[str, Any] = {"python": self._python_info(app)}
         report["catia"] = self._catia_info(app)
-        report["workbenches"] = self._workbench_probe()
-        report["factories"] = self._factory_probe()
-        report["notes"] = self._notes(report)
 
+        # Check if we have an active Part document; if not, create a
+        # temporary scratch Part so factory/workbench probes always run.
+        temp_doc = None
+        try:
+            doc = self.conn.active_document
+        except Exception:
+            doc = None
+        part = doc.Part if doc is not None and hasattr(doc, "Part") else None
+
+        if part is None:
+            try:
+                temp_doc = app.Documents.Add("Part")
+                doc = temp_doc
+                part = temp_doc.Part
+            except Exception as e:
+                report["workbenches"] = {
+                    "skipped": f"No active document and cannot create temporary part: {e}"
+                }
+                report["factories"] = {
+                    "skipped": f"No active Part document and cannot create temporary part: {e}"
+                }
+                report["notes"] = [
+                    "Cannot probe factories or workbenches without an active document."
+                ]
+                return json.dumps(report, indent=2)
+
+        try:
+            report["workbenches"] = self._workbench_probe(doc)
+            report["factories"] = self._factory_probe(doc, part)
+        finally:
+            # Close temporary document without saving
+            if temp_doc is not None:
+                try:
+                    temp_doc.Close()
+                except Exception:
+                    pass
+
+        report["notes"] = self._notes(report)
         return json.dumps(report, indent=2)
 
     def _python_info(self, app: Any) -> dict[str, Any]:
@@ -152,23 +188,12 @@ class DiagnosticsTools:
             pass
         return info
 
-    def _workbench_probe(self) -> dict[str, str]:
+    def _workbench_probe(self, doc: Any) -> dict[str, str]:
         # GetWorkbench is a Document method in the V5 automation model, so
         # probing needs an open document. SPAWorkbench is what the
         # measurement tools rely on. Note that "PartDesign" is NOT a valid
         # GetWorkbench id: Part Design is reached through Part.ShapeFactory,
         # so a GetWorkbench("PartDesign") failure proves nothing.
-        try:
-            doc = self.conn.active_document
-        except Exception:
-            doc = None
-        if doc is None:
-            return {
-                "skipped": (
-                    "No active document. Open or create one, then run "
-                    "catia_diagnose again to probe workbenches."
-                )
-            }
         probes = {}
         for wb in ("SPAWorkbench",):
             try:
@@ -178,26 +203,8 @@ class DiagnosticsTools:
                 probes[wb] = f"unavailable: {e}"
         return probes
 
-    def _factory_probe(self) -> dict[str, Any]:
+    def _factory_probe(self, doc: Any, part: Any) -> dict[str, Any]:
         result: dict[str, Any] = {}
-
-        doc = None
-        try:
-            doc = self.conn.active_document
-        except Exception:
-            pass
-        part = None
-        if doc is not None:
-            try:
-                part = doc.Part
-            except Exception:
-                pass
-        if part is None:
-            result["skipped"] = (
-                "No active Part document. Create or open a CATPart, then run "
-                "catia_diagnose again to probe the factories."
-            )
-            return result
 
         result["shape_factory"] = self._probe_methods(
             part, "ShapeFactory", _SHAPE_FACTORY_METHODS
